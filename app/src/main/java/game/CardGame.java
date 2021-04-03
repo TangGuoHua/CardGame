@@ -26,8 +26,9 @@ public class CardGame {
     // win points, default to 50;
     private int winPoint = 50;
     
-    private String playerOne="spiderMan";
-    private String playerTwo="ironMan";
+    // default name added for three player, and we can change it via set method.
+    private String playerOne="SpiderMan";
+    private String playerTwo="IronMan";
     private String playerThree="AmericanCaptain";
     
     public String getPlayerOne() {
