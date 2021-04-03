@@ -13,16 +13,43 @@ import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * This class represent 54 card deck.
- * I has  
  * @author Guohua
- *
  */
 public class CardGame {
+    // this field represent game status, stopped when one of players won the game, otherwise running.
     private  volatile Status gameStatus = Status.RUNNING; 
+    // this field indicate which card currently being sent.
     private  volatile  AtomicInteger currentCardIndex = new AtomicInteger(0);
-    private String gameName = "";
+    private String gameName = ""; // we can give this game a name, default the thread name.
+    // 54 cards will be initialized and store in this field.
     private List<Card> cardList = null;
-    private int winPoint = 0;
+    // win points, default to 50;
+    private int winPoint = 50;
+    
+    private String playerOne="spiderMan";
+    private String playerTwo="ironMan";
+    private String playerThree="AmericanCaptain";
+    
+    public String getPlayerOne() {
+        return playerOne;
+    }
+    public void setPlayerOne(String playerOne) {
+        this.playerOne = playerOne;
+    }
+    public String getPlayerTwo() {
+        return playerTwo;
+    }
+    public void setPlayerTwo(String playerTwo) {
+        this.playerTwo = playerTwo;
+    }
+    public String getPlayerThree() {
+        return playerThree;
+    }
+    public void setPlayerThree(String playerThree) {
+        this.playerThree = playerThree;
+    }
+
+    
     
     public String getGameName() {
         return gameName;
@@ -67,19 +94,21 @@ public class CardGame {
             gameStatus = Status.STOPED;
             return; 
         }
-        if(isValidCardList()) {
+        if(!isCardListInitialized()) {
             cardList = shuffleCard();
         }
         if("".equals(gameName)) {
             this.gameName = Thread.currentThread().getName();
         }
-        
+        System.out.println("Begin Game ： "+ gameName);
+        System.out.println(cardList);
+
         Lock lock = new ReentrantLock();
         Condition lockOfPlayOne = lock.newCondition(), lockOfPlayTwo = lock.newCondition(), lockOfPlayThree = lock.newCondition();
         CountDownLatch latch = new CountDownLatch(3);
-        new Player(lock, lockOfPlayThree, lockOfPlayOne, "张三", latch, this).start();
-        new Player(lock, lockOfPlayOne, lockOfPlayTwo, "李四", latch, this).start();
-        new Player(lock, lockOfPlayTwo, lockOfPlayThree, "王五", latch, this).start();
+        new Player(lock, lockOfPlayThree, lockOfPlayOne, playerOne, latch, this).start();
+        new Player(lock, lockOfPlayOne, lockOfPlayTwo, playerTwo, latch, this).start();
+        new Player(lock, lockOfPlayTwo, lockOfPlayThree, playerThree, latch, this).start();
         try {
             latch.await(); // wait all player's arrival. 
             lock.lock();
@@ -95,8 +124,8 @@ public class CardGame {
         return winPoint > 134 || winPoint < 1;
     }
 
-    public boolean isValidCardList() {  // this validation logic is open for extension 
-        return cardList == null ;
+    public boolean isCardListInitialized() {  // this validation logic is open for extension 
+        return cardList!=null && cardList.size() == 54 ;
     }
     
     private  ArrayList<Card> shuffleCard(){
@@ -107,7 +136,6 @@ public class CardGame {
         map.put(12, "Q");
         map.put(13, "K");
         map.put(20, "JOKE");
-        System.out.println("开始牌局 ： "+ gameName);
         Card[] cardArray = new Card[54];
         int id = 0;
         for (int i = 1; i <= 13; i++) {
@@ -130,7 +158,6 @@ public class CardGame {
         for (Card card : cardArray) {
             cardList.add(card);
         }
-        System.out.println(cardList);
         return cardList;
     }
 
@@ -143,111 +170,3 @@ public class CardGame {
 
 }
 
-
-
-
-class Card {
-    private int point;
-
-    public int getPoint() {
-        return point;
-    }
-
-    public void setPoint(int point) {
-        this.point = point;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    private String name;
-
-    public Card(int point, String name) {
-        this.point = point;
-        this.name = name;
-    }
-
-    public String toString() {// we can extends this method to meeting different display requirements
-        return name;
-    }
-}
-
-enum Status {
-    RUNNING, STOPED
-}
-
-
-class Player extends Thread {
-    
-   private Lock lock;
-   private CountDownLatch latch;
-   private String playerName;
-   private Condition pre, post;
-   private CardGame game; 
-
-   Player(Lock lock, Condition pre, Condition post, String playerName, CountDownLatch latch, CardGame game) {
-       this.lock = lock;
-       this.pre = pre;
-       this.post = post;
-       this.latch = latch;
-       this.playerName = playerName;
-       this.game = game;
-    }
-
-   private static ThreadLocal<List<Card>> cardsOfPlayer = new ThreadLocal<List<Card>>() {
-       @Override
-       protected List<Card> initialValue() {
-           return new ArrayList<Card>();
-       };
-   };
-
-   @Override
-   public void run() {
-       while (game.getStatus() == Status.RUNNING) {
-           lock.lock();
-           // 线程每次先进入等待状态
-           try {
-               latch.countDown();   // latch的作用是为了保证能成功唤醒第一个线程
-               pre.await();
-                pickCard(playerName);
-               post.signalAll();
-               
-           } catch (InterruptedException e) {
-               System.out.println("Interrupted");
-           }
-           finally {
-               lock.unlock();
-           }
-           
-       }
-   }
-   
-   
-
-   private void pickCard(String playId) {
-       if(Status.RUNNING == game.getStatus()) {
-           Card curCard = game.getCardList().get(game.getCurrentCardIndex().getAndIncrement());
-           // send card to this player
-           cardsOfPlayer.get().add(curCard);
-           System.out.println("发给 "+playId + " 一张 " + curCard);
-
-           // calculate the total point of the current player
-           Card total = cardsOfPlayer.get().size() > 0
-                   ? cardsOfPlayer.get().stream().reduce(new Card(0,"none"), (a, b) -> new Card(a.getPoint() + b.getPoint(),"total"))
-                   : new Card(0,"none");
-
-           if(total.getPoint()> game.getWinPoint()) {
-             System.out.println("游戏结束 "+ playId + "赢得比赛"+game.getGameName()+", 得分:" + cardsOfPlayer.get() + " = " + total.getPoint());
-
-               game.setGameStatus(Status.STOPED);
-           }
-       }
-      
-   }
-   
-}

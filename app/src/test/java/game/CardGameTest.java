@@ -17,7 +17,7 @@ public class CardGameTest {
         // Test Case 1  : input the win Point 40.  
         //The null parameter for cardList will result in auto generate cardList
         CardGame game = new CardGame(40);
-        game.setGameName(" 抓的快 ");
+        game.setGameName(" Card Deck Game ");
         test(game); 
         
         // Test Case 2 :  input the invalid win Point that no one can get this point
